@@ -1,0 +1,8 @@
+# will be passed to the docker run, build.. commands
+#namespace
+# VOLUMES = -v /var/run/docker.sock=/var/run/docker.sock
+# PORTS = -p 8080:8080
+# environment variables
+# ENV = \							
+#   -e USER=protosaider
+#   -e PASSWORD=

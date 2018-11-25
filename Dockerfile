@@ -97,7 +97,7 @@ RUN curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \
 
 USER jenkins
 
-HEALTHCHECK
+HEALTHCHECK \
 			#--interval=5s \
             #--timeout=5s \
             CMD curl -sSLf http://localhost:8080/login >/dev/null || exit 1
