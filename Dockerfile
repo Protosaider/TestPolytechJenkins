@@ -11,7 +11,10 @@ FROM ${JENKINS_NS}/${JENKINS_REPO}:${JENKINS_VER}
 
 #ENV JAVA_OPTS="-Xmx8192m"
 #ENV JENKINS_OPTS=" --handlerCountMax=300 --logfile=/var/log/jenkins/jenkins.log --httpsPort=8080 --httpsCertificate=/var/lib/jenkins/cert --httpsPrivateKey=/var/lib/jenkins/pk"
-ENV JENKINS_OPTS=" --logfile=/var/log/jenkins/jenkins.log --httpPort=8080"
+#ENV JENKINS_OPTS=" --logfile=/var/log/jenkins/jenkins.log --httpPort=8080"
+# I needed this to access my jenkins instance using context path e.g. www.abc.com/jenkins. 
+#ENV JENKINS_OPTS=" --prefix=/jenkins"
+#ENV JENKINS_OPTS=" --webroot=/var/cache/jenkins/war"
 
 USER root
 
@@ -19,8 +22,21 @@ USER root
 #####USER root
 RUN mkdir /var/log/jenkins
 RUN chown -R  jenkins:jenkins /var/log/jenkins
+
+RUN mkdir /var/cache/jenkins
+RUN chown -R jenkins:jenkins /var/cache/jenkins
+
 #####USER jenkins
 #####WORKDIR /settings
+
+# 
+# 
+# COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
+# RUN /usr/local/bin/install-plugins.sh < /usr/share/jenkins/ref/plugins.txt
+# 
+# RUN /usr/local/bin/install-plugins.sh docker-slaves github-branch-source:1.8
+# 
+
 
 RUN apt-get update \
 	### && apt-get install -y --no-install-recommends apt-transport-https \ 
@@ -69,6 +85,9 @@ RUN curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \
  && groupadd -r docker \
  && usermod -aG docker jenkins
 
+# RUN apt-get update  -qq \
+#     && apt-get install docker-ce=17.12.1~ce-0~debian -y
+
 # install all
 # 
 #     curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg > /tmp/dkey; apt-key add /tmp/dkey && \
@@ -97,10 +116,10 @@ RUN curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \
 
 USER jenkins
 
-HEALTHCHECK \
-			#--interval=5s \
-            #--timeout=5s \
-            CMD curl -sSLf http://localhost:8080/login >/dev/null || exit 1
+# HEALTHCHECK \
+# 			--interval=5s \
+#             --timeout=5s \
+#             CMD curl -sSLf http://localhost:8080/login >/dev/null || exit 1
 
 ARG BUILD_DATE
 ARG VCS_REF
@@ -111,11 +130,11 @@ LABEL \
 # This label contains the Date/Time the image was built. The value SHOULD be formatted according to RFC 3339.
     org.label-schema.build-date=$BUILD_DATE \
 #How to run a container based on the image under the Docker runtime.
-    org.label-schema.docker.cmd="docker run -d -p 8080:8080 -v \"$$(pwd)/jenkins-home:/var/jenkins_home\" -v /var/run/docker.sock:/var/run/docker.sock workinghandguard/jenkins-docker" \
+    org.label-schema.docker.cmd="docker run -d -p 8080:8080 -v \"$$(pwd)/jenkins-home:/var/jenkins_home\" -v /var/run/docker.sock:/var/run/docker.sock workinghandguard/jenkins" \
 #Text description of the image. May contain up to 300 characters.
     org.label-schema.description="Jenkins with docker support, Jenkins ${JENKINS_VER}, Docker ${DOCKER_VER}" \
 #A human friendly name for the image. For example, this could be the name of a microservice in a microservice architecture.
-    org.label-schema.name="workinghandguard/jenkins-docker" \
+    org.label-schema.name="workinghandguard/jenkins" \
 #This label SHOULD be present to indicate the version of Label Schema in use.
     org.label-schema.schema-version="1.0" \
 #URL of website with more information about the product or service provided by the container.
