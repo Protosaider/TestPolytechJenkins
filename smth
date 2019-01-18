@@ -1,0 +1,117 @@
+You can push a new image to this repository using the CLI
+
+docker tag local-image:tagname new-repo:tagname OR docker build -t <hub-user>/<repo-name>[:<tag>]
+docker push new-repo:tagname
+
+0) устанавливаем Jenkins и docker. 
+Windows-native Hyper-V virtualization and networking - это на 10 винде.
+Так как у меня винда 7, то нужно использовать docker toolbox, а не docker desktop!
+
+mingw32-make -f Makefile build
+mingw32-make -f Makefile run
+
+1) Запускаем докер-терминал
+cd "C:\Users\Protosaider\Documents\Worktable\5k\SCM_DevOps\git_jenkins_in_docker"
+
+должна быть создана network. bridge: The default network driver. If you don’t specify a driver, this is the type of network you are creating. Bridge networks are usually used when your applications run in standalone containers that need to communicate.
+
+docker network ls
+docker images
+docker ps
+docker ps -a
+
+mingw32-make -f Makefile build
+cd nginx-proxy
+mingw32-make -f Makefile build
+cd ..
+cd docker-proxy
+mingw32-make -f Makefile build
+cd ..
+cd jenkins-slave-gcloud
+mingw32-make -f Makefile build
+cd ..
+
+
+mingw32-make -f Makefile stop
+cd nginx-proxy
+mingw32-make -f Makefile stop
+cd ..
+cd docker-proxy
+mingw32-make -f Makefile stop
+cd ..
+cd jenkins-slave-gcloud
+mingw32-make -f Makefile stop
+cd ..
+
+
+ВНЕЗАПНО после того, как мне для лабораторных пришлось установить Cygwin, mingw32-make стал использовать C:/Cygwin64/bin/sh.exe как shell
+А все makefile у меня написаны с учетом того, что запускаться будут в cmd.
+
+Собираем все образы, а именно: 
+jenkins-master
+nginx-proxy
+jenkins-slave (build-slave)
+docker-proxy (connects slave and master)
+
+запущены должны быть:
+
+1 - jenkins-master
+2 - nginx-proxy
+3 - docker-proxy (connects slave and master)
+
+mingw32-make -f Makefile run
+
+cd nginx-proxy
+mingw32-make -f Makefile run
+
+cd ..
+cd docker-proxy
+mingw32-make -f Makefile run
+cd ..
+
+docker ps -a
+
+docker-machine ip
+
+в браузере: 
+192.168.99.100:80
+WEBHOOK
+1) manage => conf.syste => GitHub Server => RepoName, Token from Github
+2) Создать токен на Гитхабе, вписать его в credencials Jenkins 
+3) Внутри Jenkins создать еще один ДРУГОЙ секретный токен
+4) Передать его webhook-у на гитхабе
+5) Создать тоннель с помощью ngrok (http docker-machine ip : port)
+6) использовать адрес тоннеля для создания вэбхука
+7) COntent type - json
+8) при этом пидоры из РКН блокируют ngrok и ему подобное
+
+После:
+Create multibranch project
+Create credencials (login password from Github)
+
+ДЛЯ MULTIBRANCH PIPELINE!!!!
+
+Branch Sources > Add source > GitHub Select the API endpoint
+For Owner use the organization
+Select on of the fetched Repository from the Owner.
+For Credential use Username and Password, typing as password the personal API Token.
+Since SCM API 2.2.4 Behaviors section > Make sure Filter by name is removed unless you only want to discover a subset of branches. If it is configured make sure to include PR-* to Discover Pull Requests.
+Notes: Suppress Automatic SCM trigger property: It disables any automatic triggering, not only coming from push / pull request / repository notification but also from branch indexing.
+
+ngrok - прокси, позволяет через тоннель обращаться к компу, например к локалхост
+
+А также нужно создать Credentials для:
+Docker Hub
+G-cloud
+etc.
+
+
+
+
+run registry
+docker run -d -p 5000:5000 --restart always --name registry registry
+
+get from registry
+docker pull localhost:5000/react-app
+
+localhost:3000 - app

@@ -1,0 +1,8 @@
+1) Manage Jenkins -> Script Console
+2) run this
+List<String> jenkinsPlugins = new ArrayList<String>(Jenkins.instance.pluginManager.plugins);
+jenkinsPlugins.sort { it.shortName }
+              .each { plugin ->
+                   println ("${plugin.shortName}:${plugin.version}")
+              }
+3) in Windows: change line endings to UNIX

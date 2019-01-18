@@ -1,0 +1,44 @@
+version: "3"
+
+services:
+  jenkins-master:
+    build:
+      ./jenkins-master
+    ports:
+      -"50000:50000"
+    volumes:
+      -jenkins-data:/var/jenkins_home
+      -jenkins-log:/var/log/jenkins
+    networks:
+      -jenkins-net
+    restart: 
+      unless-stopped
+
+  nginx-proxy:
+    build:
+      ./nginx-proxy
+    ports:
+      -"80:80"
+    networks:
+      -jenkins-net
+
+  docker-proxy: 
+      build: 
+        ./docker-proxy
+      volumes:
+        -/var/run/docker.sock:/var/run/docker.sock
+      networks:
+        -jenkins-net
+          aliases:
+            -proxy1
+
+  ephemeral-slave:
+      build: 
+        ./ephemeral-slave
+
+volumes:
+  jenkins-data:
+  jenkins-log:
+
+networks:
+  jenkins-net:

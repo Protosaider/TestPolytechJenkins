@@ -1,4 +1,6 @@
-include make_env
+SHELL=cmd
+
+# include make_env
 
 .PHONY: build push pull restart run stop login clean release tag
 
@@ -8,9 +10,10 @@ MAKEFILE_COMPLETE = $(CURDIR)/$(MAKEFILE_JUSTNAME)
 $(info DIRECTORY $(CURDIR))
 
 # Image and binary can be overidden with env vars.
-DOCKER_IMAGE ?= workinghandguard/jenkins
+# Hub user / repo name
+DOCKER_IMAGE ?= jenkins-test
 # DOCKER_TAG ?= default
-CONTAINER_NAME ?= jenkins
+CONTAINER_NAME ?= jenkins-test
 
 # Get the latest commit.
 GIT_COMMIT = $(strip $(shell git rev-parse --short HEAD))
@@ -126,53 +129,60 @@ login:
 	$(info Make: Login to Docker Hub.)
 	docker login -u $(DOCKER_USER) -p $(DOCKER_PASS)
 
-	# 
-	# echo mySecret | docker secret create my_secret -
-	# 
-	# docker secret create my_secret ./secret.json
-	# 
-	# docker secret create --label env=dev \ 
-	# --label rev=20170324 \ 
-	# my_secret ./secret.json
-	# 
+# 
+# echo mySecret | docker secret create my_secret -
+# 
+# docker secret create my_secret ./secret.json
+# 
+# docker secret create --label env=dev \ 
+# --label rev=20170324 \ 
+# my_secret ./secret.json
+# 
 
 tag:
 	$(info Make: Tagging image with "$(DOCKER_TAG)".)
 	docker tag $(DOCKER_IMAGE):latest $(DOCKER_IMAGE):$(DOCKER_TAG)
 
+# 	-it \
+#	-v /var/run/docker.sock:/var/run/docker.sock \
+# -p 8080:8080 \
+
 run:
 	$(info Make: Starting "$(DOCKER_TAG)" tagged container.)
-	docker run -it \
-	-v /var/run/docker.sock:/var/run/docker.sock \
-	-p 8080:8080 \
+	docker run -d \
 	-p 50000:50000 \
 	--restart unless-stopped \
 	--name $(CONTAINER_NAME) \
 	--mount source=jenkins-log,target=/var/log/jenkins \
 	--mount source=jenkins-data,target=/var/jenkins_home \
-	$(DOCKER_IMAGE):$(DOCKER_TAG) 
+	--network jenkins-net \
+	$(DOCKER_IMAGE):$(DOCKER_TAG)
 
-	# --mount source=jenkins-log,target=/var/log/jenkins \
-	# --mount source=jenkins-data,target=/var/jenkins_home \
+# --mount source=jenkins-log,target=/var/log/jenkins \
+# --mount source=jenkins-data,target=/var/jenkins_home \
+# OR
+# -v ${PWD}/jenkins_home:/var/jenkins_home \
+# -v ${CURDIR}/jenkins_home:/var/jenkins_home \
 
-	# In DinD way you can reuse outside docker cache sharing -v /var/lib/docker:var/lib/docker.
-	# In DooD way some many scenarios include to share -v /var/lib/jenkins:/var/lib/jenkins.
+# In DinD way you can reuse outside docker cache sharing -v /var/lib/docker:var/lib/docker.
+# In DooD way some many scenarios include to share -v /var/lib/jenkins:/var/lib/jenkins.
 
-	# -d \	
-	# &&\
-	# docker logs -f $(CONTAINER_NAME)
+# -d \	
+# &&\
+# docker logs -f $(CONTAINER_NAME)
 
 stop:
 	$(info Make: Stopping "$(DOCKER_TAG)" tagged container.)
 	docker stop $(CONTAINER_NAME)
 	docker rm $(CONTAINER_NAME)
-	# Build Docker image
-	# mount "C:\Users\Username\Documents\Project" /home/Username/Project
-	# --build-arg BUILD_DATE=`date -u +%d.%m.%Y-%H:%M:%S,%2N` \
-	# -f Dockerfile .
-	### win
-	# --build-arg BUILD_DATE=`echo %date%-%time%` \
-	# --build-arg BUILD_DATE=`powershell get-date -format "{dd.MM.yyyy-HH:mm::ss.ff}"` \
+
+# Build Docker image
+# mount "C:\Users\Username\Documents\Project" /home/Username/Project
+# --build-arg BUILD_DATE=`date -u +%d.%m.%Y-%H:%M:%S,%2N` \
+# -f Dockerfile .
+### win
+# --build-arg BUILD_DATE=`echo %date%-%time%` \
+# --build-arg BUILD_DATE=`powershell get-date -format "{dd.MM.yyyy-HH:mm::ss.ff}"` \
 
 ### lin
 # docker_build: Dockerfile
@@ -187,6 +197,7 @@ stop:
 # 	@make -s clean
 
 ### win
+
 docker_build: Dockerfile
 	$(info Make: Building "$(DOCKER_TAG)" tagged images.)
 	docker build \
@@ -197,14 +208,14 @@ docker_build: Dockerfile
 	-t "$(DOCKER_IMAGE):$(DOCKER_TAG)" \
 	-f Dockerfile .
 	@$(MAKE) --silent -f "$(MAKEFILE_JUSTNAME)" clean
+
 # Automake cannot handle the concept of makefiles with alternate filenames, mainly because in order to generate the correct code, it would need to know about them.
 # make will look for the make‐files GNUmakefile, makefile, and Makefile
 
 docker_push:
-	# Tag image as latest
+# Tag image as latest
 	docker tag $(DOCKER_IMAGE):$(DOCKER_TAG) $(DOCKER_IMAGE):latest
-
-	# Push to DockerHub
+# Push to DockerHub
 	@make -s -f "$(MAKEFILE_JUSTNAME)" push
 	docker push $(DOCKER_IMAGE):latest
 

@@ -1,0 +1,59 @@
+version: "3"
+
+services:
+  jenkins-master:
+    build:
+      ./jenkins-master
+    # image:
+    #   workinghandguard/jenkins:v.0.0.0-12289f3-dirty
+    # container_name: 
+    #   Jenkins-Master
+    restart: 
+      always
+    depends_on:
+      - jenkins-nginx
+    networks:
+      -jenkins-net
+    volumes:
+      - ./jenkins-master/volume_data/logs:/var/log/jenkins
+      - ./jenkins-master/volume_data/home:/var/jenkins_home
+    networks:
+      dev-net:
+        aliases:
+          - jenkins-master.dev.internal.example.com
+
+  jenkins-nginx-reverse-proxy:
+    build:
+      ./nginx-proxy
+    restart: always
+    ports:
+      - 52443:443
+      - 50000:50000
+    volumes:
+      - ./jenkins-nginx/volume_data/ssl:/etc/ssl/certs/nginx:ro
+    networks:
+      dev-net:
+        aliases:
+          - jenkins-nginx.dev.internal.example.com
+
+  jenkins-slave:
+    build: jenkins-slave
+    image: danieleagle/jenkins-slave:8u151-jre-alpine
+    container_name: Jenkins-Slave
+
+  # docker-proxy: 
+  #     build: 
+  #       ./docker-proxy
+  #     volumes:
+  #       -/var/run/docker.sock:/var/run/docker.sock
+  #     networks:
+  #       -jenkins-net
+  #         aliases:
+  #           -proxy1
+
+# volumes:
+#   jenkins-data:
+#   jenkins-log:
+
+# networks:
+#   jenkins-net:

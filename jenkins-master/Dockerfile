@@ -9,13 +9,32 @@ FROM ${JENKINS_NS}/${JENKINS_REPO}:${JENKINS_VER}
 
 # LABEL mainteiner="workinghandguard@gmail.com" Fedor Ermolchev
 
-#ENV JAVA_OPTS="-Xmx8192m"
+#ENV JAVA_OPTS=" -Xmx8192m"
+ENV JAVA_OPTS=" -Djenkins.install.runSetupWizard=false"
+#
+#
 #ENV JENKINS_OPTS=" --handlerCountMax=300 --logfile=/var/log/jenkins/jenkins.log --httpsPort=8080 --httpsCertificate=/var/lib/jenkins/cert --httpsPrivateKey=/var/lib/jenkins/pk"
 #ENV JENKINS_OPTS=" --logfile=/var/log/jenkins/jenkins.log --httpPort=8080"
 # I needed this to access my jenkins instance using context path e.g. www.abc.com/jenkins. 
-#ENV JENKINS_OPTS=" --prefix=/jenkins"
-#ENV JENKINS_OPTS=" --webroot=/var/cache/jenkins/war"
+# ENV JENKINS_OPTS=" --prefix=/jenkins"
+# 
+# Корневой каталог веб-приложения по умолчанию. Приложение по умолчанию будет использоваться, если не будет найдена конфигурация для запрашиваемого сайта (server_name).
+# Например, при обращении к серверу по IP-адресу должен открыться сайт по умолчанию, который располагается, в нашем случае, в папке /var/cache/jenkins/war.
+# 
+# 
+# If you want to install Jenkins behind a reverse proxy with prefix, example: mysite.com/jenkins, you need to add environment variable 
+# JENKINS_OPTS="--prefix=/jenkins"
+# 
+# You can also change the default slave agent port for jenkins by defining JENKINS_SLAVE_AGENT_PORT in a sample Dockerfile
+# ENV JENKINS_SLAVE_AGENT_PORT 50001
+# 
+# actually used:
+# ENV JENKINS_OPTS=" --webroot=/var/cache/jenkins/war"
+# 
+ENV JENKINS_OPTS=" --webroot=/var/cache/jenkins/war"
 
+# Switch to root in order to have right permissions
+# to get things done
 USER root
 
 ##### # SETTING UP A LOG FOLDER
@@ -29,13 +48,31 @@ RUN chown -R jenkins:jenkins /var/cache/jenkins
 #####USER jenkins
 #####WORKDIR /settings
 
-# 
-# 
-# COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
-# RUN /usr/local/bin/install-plugins.sh < /usr/share/jenkins/ref/plugins.txt
-# 
-# RUN /usr/local/bin/install-plugins.sh docker-slaves github-branch-source:1.8
-# 
+## for tsl
+## Define argument for jenkins user
+##ARG user=jenkins
+#
+## Prep Jenkins logging and cache directories
+## RUN mkdir /var/log/jenkins \
+##   && mkdir /var/cache/jenkins \
+##   && chown -R ${user}:${user} /var/log/jenkins \
+##   && chown -R ${user}:${user} /var/cache/jenkins
+##   
+##   # Set Java and Jenkins Options
+## ENV JAVA_OPTS="-Xmx8192m -Djava.awt.headless=true -Dmail.smtp.starttls.enable=true -Duser.timezone=America/Chicago"
+## ENV JENKINS_OPTS="--logfile=/var/log/jenkins/jenkins.log  --webroot=/var/cache/jenkins/war"
+## 
+## # Install default plugins
+## COPY config/plugins.sh /usr/local/bin/plugins.sh
+## COPY config/plugins.txt /tmp/plugins.txt
+## RUN /usr/local/bin/plugins.sh /tmp/plugins.txt
+## 
+## # Jenkins log directory is a volume, so logs
+## # can be persisted and survive image upgrades
+## VOLUME /var/log/jenkins
+## 
+## # Switch to the jenkins user
+## USER ${user}
 
 
 RUN apt-get update \
@@ -57,7 +94,11 @@ RUN apt-get update \
     # wget \
 	# && curl -sSL https://get.docker.com/ | sh \
 	&& apt-get clean \
-	&& rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* 
+	# && rm -rf /var/lib/apt/lists/* \
+    
+ #    && groupadd -r docker \
+ #    && usermod -aG docker jenkins
 
 
 # 	# install gosu for a better su+exec command
@@ -70,20 +111,20 @@ RUN apt-get update \
 
 # install docker cli only
 # 
-ARG DOCKER_CLI_VERSION==5:18.09.0~3-0~debian-stretch
+# ARG DOCKER_CLI_VERSION==5:18.09.0~3-0~debian-stretch
 
-RUN curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \
- && add-apt-repository \
-     "deb [arch=amd64] https://download.docker.com/linux/debian \
-     $(lsb_release -cs) \
-     stable" \
- && apt-get update \
- && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    docker-ce-cli${DOCKER_CLI_VERSION} \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/* \
- && groupadd -r docker \
- && usermod -aG docker jenkins
+# RUN curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \
+#  && add-apt-repository \
+#      "deb [arch=amd64] https://download.docker.com/linux/debian \
+#      $(lsb_release -cs) \
+#      stable" \
+#  && apt-get update \
+#  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+#     docker-ce-cli${DOCKER_CLI_VERSION} \
+#  && apt-get clean \
+#  && rm -rf /var/lib/apt/lists/* \
+#  && groupadd -r docker \
+#  && usermod -aG docker jenkins
 
 # RUN apt-get update  -qq \
 #     && apt-get install docker-ce=17.12.1~ce-0~debian -y
@@ -113,6 +154,77 @@ RUN curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \
 #
 # #run the script manually in Dockerfile
 # RUN /usr/local/bin/install-plugins.sh docker-slaves github-branch-source:1.8
+
+COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
+RUN /usr/local/bin/install-plugins.sh < /usr/share/jenkins/ref/plugins.txt
+# 
+# RUN /usr/local/bin/install-plugins.sh docker-slaves github-branch-source:1.8
+# 
+
+
+# Jenkins home directory is a volume, so configuration and build history
+# can be persisted and survive image upgrades
+VOLUME /var/jenkins_home
+
+# !!!!!!!
+# RUN groupadd docker && gpasswd -a jenkins docker
+# 
+# OR
+# 
+# chmod 777 /var/run/docker.sock
+
+
+# # USERS
+# RUN groupmod -g 1001 jenkins
+# # RUN find / -group 1000 -exec chgrp -h 1001 {} \;
+# RUN find  / \( -fstype jfs -o -fstype jfs2 \) -nogroup -print > find_group_script.txt
+
+# RUN for file in $(cat find_group_script.txt) ; do print "Old permissions: $(ls –l $file)" >> /tmp/GID_LOG \
+#         chgrp jenkins $file \
+#         print "New permissions: $(ls –l $file)" >> /tmp/GID_LOG ; \
+#     done ;
+
+
+# RUN usermod -u 1001 jenkins -g 1001
+
+# RUN find / \( -fstype jfs -o -fstype jfs2 \) -nouser -print > find_owner_script.txt
+
+# RUN for file in $(cat find_owner_script.txt) ; do print "Old permissions: $(ls –l $file)" >> /tmp/UID_LOG \
+#         chown jenkins $file \
+#         print "New permissions: $(ls –l $file)" >> /tmp/UID_LOG ; \
+#     done ;
+
+# # RUN find / -user 1000 -exec chown -h 1001 {} \;
+
+
+# RUN groupmod -g 99 users
+# # RUN find / -user 100 -exec chown -h 99 {} \;
+# RUN find  / \( -fstype jfs -o -fstype jfs2 \) -nogroup -print > find_group_script.txt
+# RUN for file in $(cat find_group_script.txt) ; do print "Old permissions: $(ls –l $file)" >> /tmp/GID_LOG \
+#         chgrp users $file \
+#         print "New permissions: $(ls –l $file)" >> /tmp/GID_LOG ; \
+#     done ;
+
+# ENV DOCKER_USER=docker
+# ENV DOCKER_GROUP=docker
+# ARG uid=1000
+# ARG gid=100
+
+# RUN groupadd -g ${gid} ${DOCKER_GROUP} 
+# RUN adduser --uid ${uid} --gid ${gid} ${DOCKER_USER}
+
+# RUN groupmod -g ${gid} ${DOCKER_GROUP}
+
+# RUN groupadd DOCKER_USER
+# RUN groupadd -r docker && usermod -aG docker jenkins
+
+
+# RUN adduser jenkins sudo
+# RUN echo "${JENKINS_USER}    ALL=(ALL)    ALL" >> /etc/sudoers
+
+# RUN groupmod -g 100 docker
+
+
 
 USER jenkins
 

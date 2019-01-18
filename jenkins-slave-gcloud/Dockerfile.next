@@ -1,0 +1,56 @@
+FROM google/cloud-sdk:latest
+
+ENV JAVA_VERSION 8u181
+ENV JAVA_DEBIAN_VERSION 8u181-b13-2~deb9u1
+ENV LANG C.UTF-8
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    wget \
+    curl \
+    # ca-certificates \
+#	curl -fsSL https://get.docker.com/x86_64-debian-stretch \
+    zip \
+    openssh-client \
+    unzip \
+    openjdk-8-jdk="$JAVA_DEBIAN_VERSION" \
+    sudo \
+    # ca-certificates-java="$CA_CERTIFICATES_JAVA_VERSION" \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG VERSION=3.28
+ARG user=jenkins
+ARG group=jenkins
+ARG uid=1000
+ARG gid=1000
+
+ENV HOME /home/${user}
+RUN groupadd -g ${gid} ${group}
+RUN useradd -c "Jenkins user" -d $HOME -u ${uid} -g ${gid} -m ${user}
+LABEL Description="This is a base image, which provides the Jenkins agent executable (slave.jar)" Vendor="Jenkins project" Version="${VERSION}"
+
+ARG AGENT_WORKDIR=/home/${user}/agent
+
+RUN curl --create-dirs -fsSLo /usr/share/jenkins/slave.jar https://repo.jenkins-ci.org/public/org/jenkins-ci/main/remoting/${VERSION}/remoting-${VERSION}.jar \
+  && chmod 755 /usr/share/jenkins \
+  && chmod 644 /usr/share/jenkins/slave.jar
+
+# RUN sudo usermod -a -G docker jenkins
+
+USER ${user}
+ENV AGENT_WORKDIR=${AGENT_WORKDIR}
+RUN mkdir /home/${user}/.jenkins && mkdir -p ${AGENT_WORKDIR}
+
+VOLUME /home/${user}/.jenkins
+VOLUME ${AGENT_WORKDIR}
+# WORKDIR /home/${user}
+
+
+#  from internet
+# RUN curl -fsSL https://get.docker.com/ | sh
+
+# ENV DOCKER_OPTS="-H tcp://0.0.0.0:2376 -H unix:///var/run/docker.sock"
+# ENV DOCKER_OPTS="-H tcp://0.0.0.0:4243 -H unix:///var/run/docker.sock"
+# 
+
+ENTRYPOINT ["exec", "$@"]

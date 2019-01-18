@@ -1,0 +1,45 @@
+server {
+   listen       80;
+   server_name  "";
+
+   access_log off;
+
+   location / {
+      # This expects a domain name of jenkins-master to exist, which will come from the magic of Docker networks (I’ll address this below).
+      # If you aren’t using Docker networks, this has to reference the IP/hostname of wherever your Jenkins container was running.
+      # http://nameOfContainer:port
+      proxy_pass         http://jenkins:8080;
+      # you can’t set this to localhost. 
+      # That’s because each Docker container is its own localhost, and it’d think you’re referring to the host of the NGINX container, which isn’t running Jenkins on port 8080. 
+      # To avoid using Docker networks, it’d have to point to the IP address of your Dockerhost (which should be your desktop/laptop where you’re working).
+
+      proxy_set_header   Host             $host;
+      proxy_set_header   X-Real-IP        $remote_addr;
+      proxy_set_header   X-Forwarded-For  $proxy_add_x_forwarded_for;
+      proxy_set_header   X-Forwarded-Proto http;
+      # proxy_set_header        X-Forwarded-Proto $scheme;
+      # proxy_set_header   X-Forwarded-Host $server_name;
+      proxy_max_temp_file_size 0;
+
+      proxy_connect_timeout      150;
+      proxy_send_timeout         100;
+      proxy_read_timeout         100;
+
+      proxy_buffer_size          8k;
+      proxy_buffers              4 32k;
+      proxy_busy_buffers_size    64k;
+      proxy_temp_file_write_size 64k;    
+
+      # # Fix the “It appears that your reverse proxy set up is broken" error.
+      # proxy_redirect          http://jenkins:8080 $scheme://example.com;
+      # proxy_redirect          http://DOCKER_NAME:8080/jenkins http://FQDN_OR_IP/jenkins;
+      # proxy_redirect          http://DOCKER_NAME:8080/jenkins $scheme://$server_name/jenkins;
+
+      # # Required for new HTTP-based CLI
+      # proxy_http_version 1.1;
+      # proxy_request_buffering off;
+      
+      # # workaround for https://issues.jenkins-ci.org/browse/JENKINS-45651
+      # add_header 'X-SSH-Endpoint' 'FQDN_OR_IP:50022' always;
+   }
+}
