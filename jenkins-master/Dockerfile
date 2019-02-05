@@ -1,237 +1,116 @@
-ARG JENKINS_VER=lts
-# ARG JENKINS_REGISTRY=jenkins/jenkins
-ARG JENKINS_NS=jenkins
-ARG JENKINS_REPO=jenkins
+FROM debian:stretch
 
-#FROM ${JENKINS_REGISTRY}:${JENKINS_VER}
-FROM ${JENKINS_NS}/${JENKINS_REPO}:${JENKINS_VER}
-# ns - your docker namespace; repo - your docker repo name
+ENV LANG C.UTF-8
+# ENV JAVA_VERSION 8u162
+# ENV JAVA_DEBIAN_VERSION 8u162-b12-1~deb9u1
 
-# LABEL mainteiner="workinghandguard@gmail.com" Fedor Ermolchev
-
-#ENV JAVA_OPTS=" -Xmx8192m"
-ENV JAVA_OPTS=" -Djenkins.install.runSetupWizard=false"
-#
-#
-#ENV JENKINS_OPTS=" --handlerCountMax=300 --logfile=/var/log/jenkins/jenkins.log --httpsPort=8080 --httpsCertificate=/var/lib/jenkins/cert --httpsPrivateKey=/var/lib/jenkins/pk"
-#ENV JENKINS_OPTS=" --logfile=/var/log/jenkins/jenkins.log --httpPort=8080"
-# I needed this to access my jenkins instance using context path e.g. www.abc.com/jenkins. 
-# ENV JENKINS_OPTS=" --prefix=/jenkins"
-# 
-# Корневой каталог веб-приложения по умолчанию. Приложение по умолчанию будет использоваться, если не будет найдена конфигурация для запрашиваемого сайта (server_name).
-# Например, при обращении к серверу по IP-адресу должен открыться сайт по умолчанию, который располагается, в нашем случае, в папке /var/cache/jenkins/war.
-# 
-# 
-# If you want to install Jenkins behind a reverse proxy with prefix, example: mysite.com/jenkins, you need to add environment variable 
-# JENKINS_OPTS="--prefix=/jenkins"
-# 
-# You can also change the default slave agent port for jenkins by defining JENKINS_SLAVE_AGENT_PORT in a sample Dockerfile
-# ENV JENKINS_SLAVE_AGENT_PORT 50001
-# 
-# actually used:
-# ENV JENKINS_OPTS=" --webroot=/var/cache/jenkins/war"
-# 
-ENV JENKINS_OPTS=" --webroot=/var/cache/jenkins/war"
-
-# Switch to root in order to have right permissions
-# to get things done
-USER root
-
-##### # SETTING UP A LOG FOLDER
-#####USER root
-RUN mkdir /var/log/jenkins
-RUN chown -R  jenkins:jenkins /var/log/jenkins
-
-RUN mkdir /var/cache/jenkins
-RUN chown -R jenkins:jenkins /var/cache/jenkins
-
-#####USER jenkins
-#####WORKDIR /settings
-
-## for tsl
-## Define argument for jenkins user
-##ARG user=jenkins
-#
-## Prep Jenkins logging and cache directories
-## RUN mkdir /var/log/jenkins \
-##   && mkdir /var/cache/jenkins \
-##   && chown -R ${user}:${user} /var/log/jenkins \
-##   && chown -R ${user}:${user} /var/cache/jenkins
-##   
-##   # Set Java and Jenkins Options
-## ENV JAVA_OPTS="-Xmx8192m -Djava.awt.headless=true -Dmail.smtp.starttls.enable=true -Duser.timezone=America/Chicago"
-## ENV JENKINS_OPTS="--logfile=/var/log/jenkins/jenkins.log  --webroot=/var/cache/jenkins/war"
-## 
-## # Install default plugins
-## COPY config/plugins.sh /usr/local/bin/plugins.sh
-## COPY config/plugins.txt /tmp/plugins.txt
-## RUN /usr/local/bin/plugins.sh /tmp/plugins.txt
-## 
-## # Jenkins log directory is a volume, so logs
-## # can be persisted and survive image upgrades
-## VOLUME /var/log/jenkins
-## 
-## # Switch to the jenkins user
-## USER ${user}
-
+# see https://bugs.debian.org/775775
+# and https://github.com/docker-library/java/issues/19#issuecomment-70546872
+ENV CA_CERTIFICATES_JAVA_VERSION 20170531+nmu1
 
 RUN apt-get update \
-	### && apt-get install -y --no-install-recommends apt-transport-https \ 
-	# apt-transport-https - позволяет обращаться к APT-репозиториям через протокол https
-	# Use debian_frontend - because jenkins:lts image based on DEBIAN
-	&& DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends apt-transport-https \
-	# files of CA certificates to allow SSL-based applications to check for the authenticity of SSL connections.
-	ca-certificates \
-	# tool for transferring data using various protocols (URL, connecting with servers FTP, HTTP, etc.)
+    && apt-get install -y --no-install-recommends \
+    wget \
     curl \
-    # инструмент GNU для безопасной коммуникации и хранения данных. Он может использоваться для зашифровки данных и создания цифровых подписей. 
-    gnupg2 \
-	# This software provides an abstraction of the used apt repositories. It allows you to easily manage your distribution and independent software vendor software sources.
-    software-properties-common \
-    # For make command and makefiles
-    build-essential \
-    #vim \
-    # wget \
-	# && curl -sSL https://get.docker.com/ | sh \
-	&& apt-get clean \
-    && rm -rf /var/lib/apt/lists/* 
-	# && rm -rf /var/lib/apt/lists/* \
-    
- #    && groupadd -r docker \
- #    && usermod -aG docker jenkins
+    ca-certificates \
+    zip \
+    openssh-client \
+    unzip \
+    openjdk-8-jdk \
+    ca-certificates-java \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
 
-# 	# install gosu for a better su+exec command
-# ARG GOSU_VERSION=1.10
-# RUN dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')" \
-#  && wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch" \
-#  && chmod +x /usr/local/bin/gosu \
-#  && gosu nobody true 
+RUN /var/lib/dpkg/info/ca-certificates-java.postinst configure
 
+# Change uid gid to 1001 to resolve problems with Docker (security implications)
+ARG user=jenkins
+ARG group=jenkins
+ARG uid=1001
+ARG gid=1001
+ARG http_port=8080
+ARG agent_port=50000
+# ARG JENKINS_VERSION=2.112
+ARG JENKINS_VERSION=2.157
+# ARG JENKINS_VERSION=latest
+# ARG TINI_VERSION=v0.17.0
+ARG TINI_VERSION=v0.18.0
 
-# install docker cli only
-# 
-# ARG DOCKER_CLI_VERSION==5:18.09.0~3-0~debian-stretch
+# jenkins.war checksum, download will be validated using it
+# ARG JENKINS_SHA=085f597edeb0d49d54d7653f3742ba31ed72b8a1a2b053d2eb23fd806c6a5393
+ARG JENKINS_SHA=8b03ec1c74325df030c65d4f5347191efb9f3a6ee84a27fb3050a18513d937b6
 
-# RUN curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \
-#  && add-apt-repository \
-#      "deb [arch=amd64] https://download.docker.com/linux/debian \
-#      $(lsb_release -cs) \
-#      stable" \
-#  && apt-get update \
-#  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-#     docker-ce-cli${DOCKER_CLI_VERSION} \
-#  && apt-get clean \
-#  && rm -rf /var/lib/apt/lists/* \
-#  && groupadd -r docker \
-#  && usermod -aG docker jenkins
+# Can be used to customize where jenkins.war get downloaded from
+# ARG JENKINS_URL=https://repo.jenkins-ci.org/public/org/jenkins-ci/main/jenkins-war/${JENKINS_VERSION}/jenkins-war-${JENKINS_VERSION}.war
+ARG JENKINS_URL=http://mirrors.jenkins.io/war/${JENKINS_VERSION}/jenkins.war
 
-# RUN apt-get update  -qq \
-#     && apt-get install docker-ce=17.12.1~ce-0~debian -y
+ENV JENKINS_VERSION ${JENKINS_VERSION}
+ENV JENKINS_HOME /var/jenkins_home
+ENV JENKINS_SLAVE_AGENT_PORT ${agent_port}
+ENV JENKINS_UC https://updates.jenkins.io
+ENV JENKINS_UC_EXPERIMENTAL=https://updates.jenkins.io/experimental
+ENV JAVA_OPTS="-Xmx8192m -Djenkins.install.runSetupWizard=false"
+ENV JENKINS_OPTS="--handlerCountMax=300 --logfile=/var/log/jenkins/jenkins.log  --webroot=/var/cache/jenkins/war"
+ENV COPY_REFERENCE_FILE_LOG $JENKINS_HOME/copy_reference_file.log
 
-# install all
-# 
-#     curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg > /tmp/dkey; apt-key add /tmp/dkey && \
-#     add-apt-repository \
-#        "deb [arch=amd64] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
-#        $(lsb_release -cs) \
-#        stable" && \
-#  #Install docker-ce
-#     apt-get update && \
-#     apt-get -y install docker-ce && \
-#     rm -rf /var/lib/apt/lists/* && \
-#  #Install docker compose
-#     curl -L "https://github.com/docker/compose/releases/download/1.23.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose && \
-#  #Apply executable permissions to the binary
-#     chmod +x /usr/local/bin/docker-compose && \
-#     usermod -aG docker jenkins
-# USER jenkins
+# Use tini as subreaper in Docker container to adopt zombie processes
+RUN curl -fsSL https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static-$(dpkg --print-architecture) -o /sbin/tini \
+  && chmod +x /sbin/tini
 
-# ## INSTALL PLUGINS.SSH
-# # it is possible to pass a file that contains this set of plugins (with or without line breaks)
-# COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
-# RUN /usr/local/bin/install-plugins.sh < /usr/share/jenkins/ref/plugins.txt
-#
-# #run the script manually in Dockerfile
-# RUN /usr/local/bin/install-plugins.sh docker-slaves github-branch-source:1.8
-
-COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
-RUN /usr/local/bin/install-plugins.sh < /usr/share/jenkins/ref/plugins.txt
-# 
-# RUN /usr/local/bin/install-plugins.sh docker-slaves github-branch-source:1.8
-# 
-
+# Jenkins is run with user `jenkins`, uid = 1001
+# If you bind mount a volume from the host or a data container,
+# ensure you use the same uid
+RUN groupadd -g ${gid} ${group} \
+    && useradd -d "$JENKINS_HOME" -u ${uid} -g ${gid} -m -s /bin/bash ${user}
 
 # Jenkins home directory is a volume, so configuration and build history
 # can be persisted and survive image upgrades
 VOLUME /var/jenkins_home
 
-# !!!!!!!
-# RUN groupadd docker && gpasswd -a jenkins docker
-# 
-# OR
-# 
-# chmod 777 /var/run/docker.sock
+# `/usr/share/jenkins/ref/` contains all reference configuration we want
+# to set on a fresh new installation. Use it to bundle additional plugins
+# or config file with your custom jenkins Docker image.
+RUN mkdir -p /usr/share/jenkins/ref/init.groovy.d
+
+# could use ADD but this one does not check Last-Modified header neither does it allow to control checksum
+# see https://github.com/docker/docker/issues/8331
+RUN curl -fsSL ${JENKINS_URL} -o /usr/share/jenkins/jenkins.war \
+  && echo "${JENKINS_SHA}  /usr/share/jenkins/jenkins.war" | sha256sum -c -
+
+RUN chown -R ${user} "$JENKINS_HOME" /usr/share/jenkins/ref
+RUN mkdir /var/log/jenkins
+RUN mkdir /var/cache/jenkins
+RUN chown -R ${user}:${user} /var/log/jenkins
+RUN chown -R ${user}:${user} /var/cache/jenkins
+
+# for main web and slave agents:
+EXPOSE ${http_port}
+EXPOSE ${agent_port}
+
+# Copy in local config files
+COPY init.groovy /usr/share/jenkins/ref/init.groovy.d/tcp-slave-agent-port.groovy
+COPY jenkins-support /usr/local/bin/jenkins-support
+COPY plugins.sh /usr/local/bin/plugins.sh
+COPY jenkins.sh /usr/local/bin/jenkins.sh
+COPY install-plugins.sh /usr/local/bin/install-plugins.sh
+RUN chmod +x /usr/share/jenkins/ref/init.groovy.d/tcp-slave-agent-port.groovy \
+    && chmod +x /usr/local/bin/jenkins-support \
+    && chmod +x /usr/local/bin/plugins.sh \
+    && chmod +x /usr/local/bin/jenkins.sh \
+    && chmod +x /usr/local/bin/install-plugins.sh
+
+#
+# Load plugins
+COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
+RUN /usr/local/bin/install-plugins.sh < /usr/share/jenkins/ref/plugins.txt
+
+# RUN groupadd -g 102 docker \
+#     && useradd -u 1000 -g 102 docker
 
 
-# # USERS
-# RUN groupmod -g 1001 jenkins
-# # RUN find / -group 1000 -exec chgrp -h 1001 {} \;
-# RUN find  / \( -fstype jfs -o -fstype jfs2 \) -nogroup -print > find_group_script.txt
+USER ${user}
 
-# RUN for file in $(cat find_group_script.txt) ; do print "Old permissions: $(ls –l $file)" >> /tmp/GID_LOG \
-#         chgrp jenkins $file \
-#         print "New permissions: $(ls –l $file)" >> /tmp/GID_LOG ; \
-#     done ;
-
-
-# RUN usermod -u 1001 jenkins -g 1001
-
-# RUN find / \( -fstype jfs -o -fstype jfs2 \) -nouser -print > find_owner_script.txt
-
-# RUN for file in $(cat find_owner_script.txt) ; do print "Old permissions: $(ls –l $file)" >> /tmp/UID_LOG \
-#         chown jenkins $file \
-#         print "New permissions: $(ls –l $file)" >> /tmp/UID_LOG ; \
-#     done ;
-
-# # RUN find / -user 1000 -exec chown -h 1001 {} \;
-
-
-# RUN groupmod -g 99 users
-# # RUN find / -user 100 -exec chown -h 99 {} \;
-# RUN find  / \( -fstype jfs -o -fstype jfs2 \) -nogroup -print > find_group_script.txt
-# RUN for file in $(cat find_group_script.txt) ; do print "Old permissions: $(ls –l $file)" >> /tmp/GID_LOG \
-#         chgrp users $file \
-#         print "New permissions: $(ls –l $file)" >> /tmp/GID_LOG ; \
-#     done ;
-
-# ENV DOCKER_USER=docker
-# ENV DOCKER_GROUP=docker
-# ARG uid=1000
-# ARG gid=100
-
-# RUN groupadd -g ${gid} ${DOCKER_GROUP} 
-# RUN adduser --uid ${uid} --gid ${gid} ${DOCKER_USER}
-
-# RUN groupmod -g ${gid} ${DOCKER_GROUP}
-
-# RUN groupadd DOCKER_USER
-# RUN groupadd -r docker && usermod -aG docker jenkins
-
-
-# RUN adduser jenkins sudo
-# RUN echo "${JENKINS_USER}    ALL=(ALL)    ALL" >> /etc/sudoers
-
-# RUN groupmod -g 100 docker
-
-
-
-USER jenkins
-
-# HEALTHCHECK \
-# 			--interval=5s \
-#             --timeout=5s \
-#             CMD curl -sSLf http://localhost:8080/login >/dev/null || exit 1
 
 ARG BUILD_DATE
 ARG VCS_REF
@@ -261,29 +140,6 @@ LABEL \
 #You SHOULD omit the version label, or use a marker like “dirty” or “test” to indicate when a container image does not match a labelled / tagged version of the code.
     org.label-schema.version="${JENKINS_NS}/${JENKINS_REPO}:${JENKINS_VER}-${VERSION}"
 
-## entrypoint is used to update docker gid and revert back to jenkins user
-# COPY entrypoint.sh /entrypoint.sh
-# RUN chmod +x /entrypoint.sh
-# ENTRYPOINT ["/entrypoint.sh"]
-# HEALTHCHECK CMD curl -sSLf http://localhost:8080/login >/dev/null || exit 1
-# 
-# ARG BUILD_DATE
-# ARG VCS_REF
-# ARG IMAGE_PATCH_VER=0
-# LABEL \
-#     org.label-schema.build-date=$BUILD_DATE \
-#     org.label-schema.docker.cmd="docker run -d -p 8080:8080 -v \"$$(pwd)/jenkins-home:/var/jenkins_home\" -v /var/run/docker.sock:/var/run/docker.sock bmitch3020/jenkins-docker" \
-#     org.label-schema.description="Jenkins with docker support, Jenkins ${JENKINS_VER}, Docker ${DOCKER_VER}" \
-#     org.label-schema.name="bmitch3020/jenkins-docker" \
-#     org.label-schema.schema-version="1.0" \
-#     org.label-schema.url="https://github.com/sudo-bmitch/jenkins-docker" \
-#     org.label-schema.vcs-ref=$VCS_REF \
-#     org.label-schema.vcs-url="https://github.com/sudo-bmitch/jenkins-docker" \
-#     org.label-schema.vendor="Brandon Mitchell" \
-#     org.label-schema.version="${JENKINS_VER}-${IMAGE_PATCH_VER}"
 
-# ????????
-# 
-# COPY Jenkinsfile /program/Jenkinsfile
-# ADD ./nginx.conf /etc/nginx/
-# (путь указывается относительно папки в которой находится dockerfile)
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/jenkins.sh"]
+

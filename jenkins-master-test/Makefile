@@ -11,9 +11,9 @@ $(info DIRECTORY $(CURDIR))
 
 # Image and binary can be overidden with env vars.
 # Hub user / repo name
-DOCKER_IMAGE ?= jenkins-test
+DOCKER_IMAGE ?= workinghandguard/jenkins
 # DOCKER_TAG ?= default
-CONTAINER_NAME ?= jenkins-test
+CONTAINER_NAME ?= jenkins
 
 # Get the latest commit.
 GIT_COMMIT = $(strip $(shell git rev-parse --short HEAD))

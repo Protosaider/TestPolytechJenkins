@@ -96,7 +96,6 @@ pubsub-light:1.12
 resource-disposer:0.12
 scm-api:2.3.0
 script-security:1.49
-slack:2.14
 sse-gateway:1.17
 ssh-agent:1.17
 ssh-credentials:1.14
